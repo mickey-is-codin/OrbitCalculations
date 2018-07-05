@@ -10,7 +10,13 @@ class GetInput(object):
 		return self.eye_radius
 
 	def get_bleb(self):
-		self.bleb_radius = float(input("Radius of the bleb in mm: "))		#Method for getting bleb radius input
+		#self.bleb_radius = float(input("Radius of the bleb in mm: "))		#Method for getting bleb radius input
+		
+		self.bleb_radius = input("List of radii of the bleb in mm separated by spaces: ").split(' ')
+
+		for i in range(0,len(self.bleb_radius)):
+			self.bleb_radius[i] = float(self.bleb_radius[i])
+		
 		return self.bleb_radius
 
 	def get_dx(self):
@@ -24,37 +30,43 @@ def main():
 
 	fetch_input = GetInput()									#Create an instance of the input getting class so we can use it for further input
 
-	eye_radius = fetch_input.get_eye()							#Eyeball radius in mm
-	bleb_radius = fetch_input.get_bleb()						#Bleb radius in mm
-	dx = fetch_input.get_dx()									#Get the desired time division for integration
+	desired_volumes = [10, 50, 100, 150, 200, 250, 300]
+	eye_radius = 11.55
+	bleb_radius = [0 for i in range(0,len(desired_volumes))]
+	tolerance = 0.005
+	dx = 0.0001
+	rev_volume = [0 for i in range(0,len(desired_volumes))]
+	bleb_volume = [0 for i in range(0,len(desired_volumes))]
+	bleb_area = [0 for i in range(0,len(desired_volumes))]
+	meet_point_x = [0 for i in range(0,len(desired_volumes))]
+	meet_point_y = [0 for i in range(0,len(desired_volumes))]
+	quad1_area = [0 for i in range(0,len(desired_volumes))]
+	rev_volume = [0 for i in range(0,len(desired_volumes))]
+	surface_area = [0 for i in range(0,len(desired_volumes))]
 
-	#----Can hard code eye, bleb, and integration interval here----#
-	#eye_radius = 45.0
-	#bleb_radius = 23.0
-	#dx = 0.001
+	for i in range(0,len(desired_volumes)):
+		while rev_volume[i] < (desired_volumes[i] - tolerance):
+			eye_volume = get_volume(eye_radius)							#Eyeball volume in mm^3
+			bleb_volume[i] = get_volume(bleb_radius[i])						#Bleb volume in mm^3
 
-	eye_volume = get_volume(eye_radius)							#Eyeball volume in mm^3
-	bleb_volume = get_volume(bleb_radius)						#Bleb volume in mm^3
-	print("Volume of the eye: %.2f cubic mm" % eye_volume)
-	print("Volume of the bleb (including region outside of eye: %.2f cubic mm" % bleb_volume)
-	print("\n-----------------------------------------------------------------\n")
+			eye_area = get_area(eye_radius)								#Eyeball surface area in mm^2
+			bleb_area[i] = get_area(bleb_radius[i])							#Bleb surface area in mm^2
 
-	eye_area = get_area(eye_radius)								#Eyeball surface area in mm^2
-	bleb_area = get_area(bleb_radius)							#Bleb surface area in mm^2
-	print("Surface area of the eye: %.2f square mm" % eye_area)
-	print("Surface area of the bleb: %.2f square mm" % bleb_area)
-	print("\n-----------------------------------------------------------------\n")
+			#Bleb Equation: y = sqrt(r^2 - x^2) or x = sqrt(r^2 - y^2)
+			#Eyeball Equation: x = sqrt(y) * sqrt(2*R - y)
 
-	#Bleb Equation: y = sqrt(r^2 - x^2) or x = sqrt(r^2 - y^2)
-	#Eyeball Equation: x = sqrt(y) * sqrt(2*R - y)
+			meet_point_x[i] = intersection_x(bleb_radius[i], eye_radius)			#The x location of the intersection of the two circles
+			meet_point_y[i] = intersection_y(bleb_radius[i], eye_radius)			#The y locaiton of the intersection of the two circles
 
-	meet_point_x = intersection_x(bleb_radius, eye_radius)			#The x location of the intersection of the two circles
-	meet_point_y = intersection_y(bleb_radius, eye_radius)			#The y locaiton of the intersection of the two circles
+			quad1_area[i] = quad1_x_section(bleb_radius[i], eye_radius, meet_point_x[i], dx)			#The cross sectional area between the two circles contained in quadrant I
 
-	quad1_area = quad1_x_section(bleb_radius, eye_radius, meet_point_x, dx)			#The cross sectional area between the two circles contained in quadrant I
+			rev_volume[i] = rev_integral(bleb_radius[i], eye_radius, meet_point_x[i], meet_point_y[i], dx)	#Volume of the cross section revolved around the y axis
+			surface_area[i] = surface_integral(bleb_radius[i], eye_radius, meet_point_x[i], meet_point_y[i], dx)	#Surface of the volume created by revolution
 
-	rev_volume = rev_integral(bleb_radius, eye_radius, meet_point_x, meet_point_y, dx)	#Volume of the cross section revolved around the y axis
-	surface_area = surface_integral(bleb_radius, eye_radius, meet_point_x, meet_point_y, dx)	#Surface of the volume created by revolution
+			bleb_radius[i] = bleb_radius[i] + .01
+
+		print("Bleb Radius: ", bleb_radius[i])
+		print("Volume: ", rev_volume[i])
 
 def get_volume(r):
 	volume = (4/3) * math.pi * r**3									#Using the generic volume of a sphere equation
@@ -86,8 +98,8 @@ def quad1_x_section(r, R, meet_point, dx):
 		bleb_points.append(math.sqrt(r**2 - nums[n]**2))
 		area = area + bleb_points[n]*dx - eye_points[n]*dx
 
-	print("Cross sectional area in the first quadrant: %.2f square mm" % area)
-	print("\n-----------------------------------------------------------------\n")
+	#print("Cross sectional area in the first quadrant: %.2f square mm" % area)
+	#print("\n-----------------------------------------------------------------\n")
 
 	return area
 
@@ -119,8 +131,8 @@ def rev_integral(r, R, meet_point_x, meet_point_y, dx):
 		volume_bleb = volume_bleb + bleb_integral[n]*dx
 
 	rev_volume = volume_eye + volume_bleb							#Sum of the two integrals shoudl be the volume
-	print("Volume of the bleb contained in the eye (displacement of the eye): %.2f cubic mm" % rev_volume)
-	print("\n-----------------------------------------------------------------\n")
+	#print("Volume of the bleb contained in the eye (displacement of the eye): %.2f cubic mm" % rev_volume)
+	#print("\n-----------------------------------------------------------------\n")
 
 	return rev_volume
 
@@ -156,10 +168,10 @@ def surface_integral(r, R, meet_point_x, meet_point_y, dx):
 		surface_bleb = surface_bleb + bleb_integral[n]*dx
 
 	surface_area = surface_eye + surface_bleb
-	print("Full surface area of the bleb contained in the eye: %.2f square mm" % surface_area)
-	print("Surface area of the bleb receiving drug: %.2f square mm" % surface_eye)
-	print("Surface area of the eye that the bleb is underneath: %.2f square mm" % surface_bleb)
-	print("\n-----------------------------------------------------------------\n")
+	#print("Full surface area of the bleb contained in the eye: %.2f square mm" % surface_area)
+	#print("Surface area of the bleb receiving drug: %.2f square mm" % surface_eye)
+	#print("Surface area of the eye that the bleb is underneath: %.2f square mm" % surface_bleb)
+	#print("\n-----------------------------------------------------------------\n")
 
 	return surface_area
 
